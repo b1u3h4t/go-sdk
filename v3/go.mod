@@ -2,7 +2,8 @@ module github.com/FISCO-BCOS/go-sdk/v3
 
 go 1.21.5
 
-// replace github.com/FISCO-BCOS/bcos-c-sdk => ../../bcos-c-sdk
+// Use fork to include memory leak fix: https://github.com/FISCO-BCOS/bcos-c-sdk/pull/240
+replace github.com/FISCO-BCOS/bcos-c-sdk => github.com/b1u3h4t/bcos-c-sdk v0.0.0-20260202062031-f331199f0b7a
 
 require (
 	github.com/FISCO-BCOS/bcos-c-sdk v0.0.0-20240726021820-a278b4749e34
@@ -17,7 +18,6 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/urfave/cli/v2 v2.25.7
 	golang.org/x/crypto v0.18.0
-	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a
 	golang.org/x/time v0.3.0
 )
 
@@ -100,6 +100,7 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
+	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.20.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
