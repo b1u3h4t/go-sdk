@@ -24,8 +24,16 @@ func SM2PubBytes(pub *ecdsa.PublicKey) []byte {
 		return nil
 	}
 	pubBytes := make([]byte, publicKeyLength)
-	copy(pubBytes[:], pub.X.Bytes())
-	copy(pubBytes[publicKeyLength/2:], pub.Y.Bytes())
+
+	xb := pub.X.Bytes()
+	yb := pub.Y.Bytes()
+	if len(xb) > publicKeyLength/2 || len(yb) > publicKeyLength/2 {
+		return nil
+	}
+
+	// Right-align each coordinate in its 32-byte slot (left pad with zeros)
+	copy(pubBytes[publicKeyLength/2-len(xb):publicKeyLength/2], xb)
+	copy(pubBytes[publicKeyLength-len(yb):], yb)
 	return pubBytes
 }
 

@@ -1,8 +1,13 @@
 package smcrypto
 
 import (
+	"bytes"
 	"encoding/hex"
+	"math/big"
 	"testing"
+
+	"github.com/FISCO-BCOS/crypto/ecdsa"
+	"github.com/FISCO-BCOS/crypto/elliptic"
 )
 
 const sm2pem = `-----BEGIN PRIVATE KEY-----
@@ -153,3 +158,28 @@ func TestHexToSM2(t *testing.T) {
 // 	sm2pk, _ := gmssl.NewPublicKeyFromPEM(sm2pkpem)
 // 	return sm2pk.Verify("sm2sign", tbs, sig, nil)
 // }
+
+func TestSM2PubBytes_RightAlignedPadding(t *testing.T) {
+	curve := elliptic.Sm2p256v1()
+
+	// Construct a pubkey with short X/Y byte lengths (leading zeros in 32-byte representation).
+	x := new(big.Int).SetInt64(1) // 0x01 -> len(Bytes()) == 1
+	y := new(big.Int).SetInt64(2) // 0x02 -> len(Bytes()) == 1
+
+	pub := &ecdsa.PublicKey{Curve: curve, X: x, Y: y}
+	got := SM2PubBytes(pub)
+	if got == nil {
+		t.Fatalf("SM2PubBytes returned nil")
+	}
+	if len(got) != 64 {
+		t.Fatalf("unexpected pubBytes len: got %d, want 64", len(got))
+	}
+
+	want := make([]byte, 64)
+	want[31] = 0x01 // X right-aligned in first 32 bytes
+	want[63] = 0x02 // Y right-aligned in last 32 bytes
+
+	if !bytes.Equal(got, want) {
+		t.Fatalf("pubBytes mismatch.\n got: %x\nwant: %x", got, want)
+	}
+}
