@@ -12,9 +12,21 @@ import (
 )
 
 const defaultSM2ID = "1234567812345678"
+const sm2FieldBytes = 32
 
-// SM2PreProcess compute z value of id and return z||m
+func bigIntTo32Bytes(n *big.Int) []byte {
+	b := n.Bytes()
+	if len(b) > sm2FieldBytes {
+		b = b[len(b)-sm2FieldBytes:]
+	}
+	out := make([]byte, sm2FieldBytes)
+	copy(out[sm2FieldBytes-len(b):], b)
+	return out
+}
+
+// SM2PreProcess compute z value of id and return z||m. Pads a,b,Gx,Gy,X,Y to 32 bytes big-endian to match OpenSSL sm2_compute_z_digest and bcos-crypto WITH_SM2_OPTIMIZE (GM/T 0003).
 func SM2PreProcess(src []byte, id string, priv *ecdsa.PrivateKey) ([]byte, error) {
+	params := elliptic.Sm2p256v1().Params()
 	length := uint16(len(id) * 8)
 	var data []byte
 	buf := bytes.NewBuffer(data)
@@ -26,27 +38,27 @@ func SM2PreProcess(src []byte, id string, priv *ecdsa.PrivateKey) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	_, err = buf.Write(elliptic.Sm2p256v1().Params().A.Bytes())
+	_, err = buf.Write(bigIntTo32Bytes(params.A))
 	if err != nil {
 		return nil, err
 	}
-	_, err = buf.Write(elliptic.Sm2p256v1().Params().B.Bytes())
+	_, err = buf.Write(bigIntTo32Bytes(params.B))
 	if err != nil {
 		return nil, err
 	}
-	_, err = buf.Write(elliptic.Sm2p256v1().Params().Gx.Bytes())
+	_, err = buf.Write(bigIntTo32Bytes(params.Gx))
 	if err != nil {
 		return nil, err
 	}
-	_, err = buf.Write(elliptic.Sm2p256v1().Params().Gy.Bytes())
+	_, err = buf.Write(bigIntTo32Bytes(params.Gy))
 	if err != nil {
 		return nil, err
 	}
-	_, err = buf.Write(priv.X.Bytes())
+	_, err = buf.Write(bigIntTo32Bytes(priv.X))
 	if err != nil {
 		return nil, err
 	}
-	_, err = buf.Write(priv.Y.Bytes())
+	_, err = buf.Write(bigIntTo32Bytes(priv.Y))
 	if err != nil {
 		return nil, err
 	}
