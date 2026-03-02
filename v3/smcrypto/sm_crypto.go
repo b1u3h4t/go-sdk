@@ -23,10 +23,14 @@ func SM2PubBytes(pub *ecdsa.PublicKey) []byte {
 	if pub == nil || pub.X == nil || pub.Y == nil {
 		return nil
 	}
-	pubBytes := make([]byte, publicKeyLength)
-	copy(pubBytes[:], pub.X.Bytes())
-	copy(pubBytes[publicKeyLength/2:], pub.Y.Bytes())
-	return pubBytes
+	const half = publicKeyLength / 2
+	x := pub.X.Bytes()
+	y := pub.Y.Bytes()
+	out := make([]byte, publicKeyLength)
+	// Right-align each coordinate in its 32-byte slot (left pad with zeros)
+	copy(out[half-len(x):half], x)
+	copy(out[publicKeyLength-len(y):], y)
+	return out
 }
 
 // PubkeyToAddress calculate address from sm2p256v1 private key
