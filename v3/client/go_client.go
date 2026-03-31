@@ -263,6 +263,18 @@ func (c *Client) CreateEncodedTransactionDataV1(to *common.Address, input []byte
 	return c.conn.GetCSDK().CreateEncodedTransactionDataV1(blockLimit, addressHex, input, abi)
 }
 
+func (c *Client) CreateEncodedTransactionDataV1WithNonce(ctx context.Context, to *common.Address, input []byte, blockLimit int64, abi string, nonce string, value string, gasPrice string) ([]byte, []byte, error) {
+	_ = ctx
+	if strings.TrimSpace(nonce) == "" {
+		return c.CreateEncodedTransactionDataV1(to, input, blockLimit, abi)
+	}
+	addressHex := ""
+	if to != nil {
+		addressHex = strings.ToLower(to.String()[2:])
+	}
+	return c.conn.GetCSDK().CreateEncodedTransactionDataV1WithNonceV1Data(blockLimit, addressHex, input, abi, strings.TrimSpace(nonce), value, gasPrice)
+}
+
 func (c *Client) CreateEncodedSignature(hash []byte) ([]byte, error) {
 	return c.conn.GetCSDK().CreateEncodedSignature(hash)
 }
