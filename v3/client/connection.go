@@ -72,6 +72,17 @@ type requestOp struct {
 	//handler      func(*types.Receipt, error)
 }
 
+var nonBatchableRPCMethods = map[string]struct{}{
+	// Method names keep the same casing as the existing CallContext switch keys.
+	"asyncSendTransaction":   {},
+	"sendTransaction":        {},
+	"SendEncodedTransaction": {},
+}
+
+var batchCallExecutor = func(c *Connection, ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	return c.CallContext(ctx, result, method, args...)
+}
+
 type EventLogRespResult struct {
 	LogIndex         int    `json:"logIndex"`
 	TransactionIndex int    `json:"transactionIndex"`
@@ -329,6 +340,82 @@ func (c *Connection) PublishAmopTopicMessage(ctx context.Context, topic string, 
 func (c *Connection) Call(result interface{}, method string, args ...interface{}) error {
 	ctx := context.Background()
 	return c.CallContext(ctx, result, method, args...)
+}
+
+// BatchCall performs multiple JSON-RPC calls concurrently.
+//
+// This method is implemented at SDK level by concurrent single-call dispatch
+// and is primarily intended for read-only RPC methods.
+func (c *Connection) BatchCall(elems []BatchElem) error {
+	return c.BatchCallContext(context.Background(), elems)
+}
+
+// BatchCallContext performs multiple JSON-RPC calls concurrently.
+//
+// Each element is isolated: element-level failures are written to BatchElem.Error
+// without aborting successful elements. State-changing transaction methods are
+// intentionally rejected to avoid ambiguous side effects in concurrent batching.
+func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) error {
+	if len(elems) == 0 {
+		return nil
+	}
+
+	type callResult struct {
+		index int
+		err   error
+	}
+	results := make(chan callResult, len(elems))
+	done := make([]bool, len(elems))
+	pending := 0
+
+	for i := range elems {
+		if _, exists := nonBatchableRPCMethods[elems[i].Method]; exists {
+			elems[i].Error = fmt.Errorf("rpc method %q cannot be used in batch call", elems[i].Method)
+			done[i] = true
+			continue
+		}
+
+		method := elems[i].Method
+		args := append([]interface{}(nil), elems[i].Args...)
+		result := elems[i].Result
+		pending++
+		go func(index int, method string, args []interface{}, result interface{}) {
+			err := batchCallExecutor(c, ctx, result, method, args...)
+			select {
+			case results <- callResult{index: index, err: err}:
+			case <-ctx.Done():
+			}
+		}(i, method, args, result)
+	}
+
+	for pending > 0 {
+		select {
+		case <-ctx.Done():
+		drainResults:
+			for {
+				select {
+				case result := <-results:
+					elems[result.index].Error = result.err
+					done[result.index] = true
+					pending--
+				default:
+					break drainResults
+				}
+			}
+			ctxErr := ctx.Err()
+			for i := range elems {
+				if !done[i] {
+					elems[i].Error = ctxErr
+				}
+			}
+			return ctxErr
+		case result := <-results:
+			elems[result.index].Error = result.err
+			done[result.index] = true
+			pending--
+		}
+	}
+	return nil
 }
 
 // CallContext performs a JSON-RPC call with the given arguments. If the context is

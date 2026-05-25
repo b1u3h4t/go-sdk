@@ -192,6 +192,16 @@ func (c *Client) PendingCodeAt(ctx context.Context, address common.Address) ([]b
 	return js, err
 }
 
+// BatchCall performs multiple RPC calls concurrently through the underlying connection.
+func (c *Client) BatchCall(elems []BatchElem) error {
+	return c.conn.BatchCall(elems)
+}
+
+// BatchCallContext performs multiple RPC calls concurrently through the underlying connection.
+func (c *Client) BatchCallContext(ctx context.Context, elems []BatchElem) error {
+	return c.conn.BatchCallContext(ctx, elems)
+}
+
 // CallContract invoke the call method of rpc api
 func (c *Client) CallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error) {
 	var hexBytes []byte
