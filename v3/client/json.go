@@ -55,6 +55,17 @@ type jsonError struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+// BatchElem describes one RPC call in a batch request.
+//
+// Result must be a pointer if response decoding is needed. Error is populated by
+// BatchCallContext after execution.
+type BatchElem struct {
+	Method string
+	Args   []interface{}
+	Result interface{}
+	Error  error
+}
+
 func (err *jsonError) Error() string {
 	if err.Message == "" {
 		return fmt.Sprintf("json-rpc error %d", err.Code)

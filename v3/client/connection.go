@@ -63,6 +63,7 @@ type Connection struct {
 	notifyLock        sync.Mutex
 	closed            bool
 	lock              sync.Mutex
+	callContextHook   func(ctx context.Context, result interface{}, method string, args ...interface{}) error
 }
 
 type requestOp struct {
@@ -70,6 +71,12 @@ type requestOp struct {
 	err          error
 	respChanData *csdk.CallbackChan
 	//handler      func(*types.Receipt, error)
+}
+
+var nonBatchableRPCMethods = map[string]struct{}{
+	"asyncSendTransaction":   {},
+	"sendTransaction":        {},
+	"SendEncodedTransaction": {},
 }
 
 type EventLogRespResult struct {
@@ -331,12 +338,88 @@ func (c *Connection) Call(result interface{}, method string, args ...interface{}
 	return c.CallContext(ctx, result, method, args...)
 }
 
+// BatchCall performs multiple JSON-RPC calls concurrently.
+//
+// This method is implemented at SDK level by concurrent single-call dispatch
+// and is primarily intended for read-only RPC methods.
+func (c *Connection) BatchCall(elems []BatchElem) error {
+	return c.BatchCallContext(context.Background(), elems)
+}
+
+// BatchCallContext performs multiple JSON-RPC calls concurrently.
+//
+// Each element is isolated: element-level failures are written to BatchElem.Error
+// without aborting successful elements. State-changing transaction methods are
+// intentionally rejected to avoid ambiguous side effects in concurrent batching.
+func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) error {
+	if len(elems) == 0 {
+		return nil
+	}
+
+	type callResult struct {
+		index int
+		err   error
+	}
+	results := make(chan callResult, len(elems))
+	done := make([]bool, len(elems))
+	pending := 0
+
+	for i := range elems {
+		if _, exists := nonBatchableRPCMethods[elems[i].Method]; exists {
+			elems[i].Error = fmt.Errorf("rpc method %q cannot be used in batch call", elems[i].Method)
+			done[i] = true
+			continue
+		}
+
+		pending++
+		go func(index int) {
+			err := c.CallContext(ctx, elems[index].Result, elems[index].Method, elems[index].Args...)
+			select {
+			case results <- callResult{index: index, err: err}:
+			case <-ctx.Done():
+			}
+		}(i)
+	}
+
+	for pending > 0 {
+		select {
+		case <-ctx.Done():
+			ctxErr := ctx.Err()
+			for {
+				select {
+				case result := <-results:
+					elems[result.index].Error = result.err
+					done[result.index] = true
+					pending--
+				default:
+					goto markCanceled
+				}
+			}
+		markCanceled:
+			for i := range elems {
+				if !done[i] {
+					elems[i].Error = ctxErr
+				}
+			}
+			return ctxErr
+		case result := <-results:
+			elems[result.index].Error = result.err
+			done[result.index] = true
+			pending--
+		}
+	}
+	return nil
+}
+
 // CallContext performs a JSON-RPC call with the given arguments. If the context is
 // canceled before the call has successfully returned, CallContext returns immediately.
 //
 // The result must be a pointer so that package json can unmarshal into it. You
 // can also pass nil, in which case the result is ignored.
 func (c *Connection) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	if c.callContextHook != nil {
+		return c.callContextHook(ctx, result, method, args...)
+	}
 	//logrus.Infof("CallContext method:%s\n", method)
 	op := &requestOp{respChanData: &csdk.CallbackChan{Data: nil}}
 
