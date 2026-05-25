@@ -74,6 +74,7 @@ type requestOp struct {
 }
 
 var nonBatchableRPCMethods = map[string]struct{}{
+	// Method names keep the same casing as the existing CallContext switch keys.
 	"asyncSendTransaction":   {},
 	"sendTransaction":        {},
 	"SendEncodedTransaction": {},
@@ -371,14 +372,17 @@ func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) er
 			continue
 		}
 
+		method := elems[i].Method
+		args := append([]interface{}(nil), elems[i].Args...)
+		result := elems[i].Result
 		pending++
-		go func(index int) {
-			err := c.CallContext(ctx, elems[index].Result, elems[index].Method, elems[index].Args...)
+		go func(index int, method string, args []interface{}, result interface{}) {
+			err := c.CallContext(ctx, result, method, args...)
 			select {
 			case results <- callResult{index: index, err: err}:
 			case <-ctx.Done():
 			}
-		}(i)
+		}(i, method, args, result)
 	}
 
 	for pending > 0 {
