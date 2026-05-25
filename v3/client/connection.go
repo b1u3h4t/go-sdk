@@ -389,6 +389,7 @@ func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) er
 		select {
 		case <-ctx.Done():
 			ctxErr := ctx.Err()
+		drainResults:
 			for {
 				select {
 				case result := <-results:
@@ -396,10 +397,9 @@ func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) er
 					done[result.index] = true
 					pending--
 				default:
-					goto markCanceled
+					break drainResults
 				}
 			}
-		markCanceled:
 			for i := range elems {
 				if !done[i] {
 					elems[i].Error = ctxErr
