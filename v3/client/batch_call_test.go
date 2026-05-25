@@ -9,19 +9,22 @@ import (
 )
 
 func TestBatchCallContextSuccess(t *testing.T) {
-	conn := &Connection{
-		testCallContextHook: func(_ context.Context, result interface{}, method string, _ ...interface{}) error {
-			switch method {
-			case "getBlockNumber":
-				*(result.(*int64)) = 100
-			case "getPeers":
-				*(result.(*[]string)) = []string{"node0", "node1"}
-			case "getGroupList":
-				*(result.(*[]string)) = []string{"group0"}
-			}
-			return nil
-		},
+	originExecutor := batchCallExecutor
+	t.Cleanup(func() {
+		batchCallExecutor = originExecutor
+	})
+	batchCallExecutor = func(_ *Connection, _ context.Context, result interface{}, method string, _ ...interface{}) error {
+		switch method {
+		case "getBlockNumber":
+			*(result.(*int64)) = 100
+		case "getPeers":
+			*(result.(*[]string)) = []string{"node0", "node1"}
+		case "getGroupList":
+			*(result.(*[]string)) = []string{"group0"}
+		}
+		return nil
 	}
+	conn := &Connection{}
 
 	var blockNumber int64
 	var peers []string
@@ -53,20 +56,23 @@ func TestBatchCallContextSuccess(t *testing.T) {
 
 func TestBatchCallContextPartialFailureIsolation(t *testing.T) {
 	expectedErr := errors.New("mock failure")
-	conn := &Connection{
-		testCallContextHook: func(_ context.Context, result interface{}, method string, _ ...interface{}) error {
-			switch method {
-			case "getBlockNumber":
-				*(result.(*int64)) = 123
-				return nil
-			case "getPeers":
-				return expectedErr
-			default:
-				*(result.(*[]string)) = []string{"group0", "group1"}
-				return nil
-			}
-		},
+	originExecutor := batchCallExecutor
+	t.Cleanup(func() {
+		batchCallExecutor = originExecutor
+	})
+	batchCallExecutor = func(_ *Connection, _ context.Context, result interface{}, method string, _ ...interface{}) error {
+		switch method {
+		case "getBlockNumber":
+			*(result.(*int64)) = 123
+			return nil
+		case "getPeers":
+			return expectedErr
+		default:
+			*(result.(*[]string)) = []string{"group0", "group1"}
+			return nil
+		}
 	}
+	conn := &Connection{}
 
 	var blockNumber int64
 	var peers []string
@@ -92,18 +98,21 @@ func TestBatchCallContextPartialFailureIsolation(t *testing.T) {
 }
 
 func TestBatchCallContextCancelTimeout(t *testing.T) {
-	conn := &Connection{
-		testCallContextHook: func(ctx context.Context, result interface{}, method string, _ ...interface{}) error {
-			switch method {
-			case "fast":
-				*(result.(*int64)) = 7
-				return nil
-			default:
-				<-ctx.Done()
-				return ctx.Err()
-			}
-		},
+	originExecutor := batchCallExecutor
+	t.Cleanup(func() {
+		batchCallExecutor = originExecutor
+	})
+	batchCallExecutor = func(_ *Connection, ctx context.Context, result interface{}, method string, _ ...interface{}) error {
+		switch method {
+		case "fast":
+			*(result.(*int64)) = 7
+			return nil
+		default:
+			<-ctx.Done()
+			return ctx.Err()
+		}
 	}
+	conn := &Connection{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 	defer cancel()
@@ -128,11 +137,14 @@ func TestBatchCallContextCancelTimeout(t *testing.T) {
 }
 
 func TestBatchCallContextRejectsStateChangingMethods(t *testing.T) {
-	conn := &Connection{
-		testCallContextHook: func(_ context.Context, _ interface{}, _ string, _ ...interface{}) error {
-			return nil
-		},
+	originExecutor := batchCallExecutor
+	t.Cleanup(func() {
+		batchCallExecutor = originExecutor
+	})
+	batchCallExecutor = func(_ *Connection, _ context.Context, _ interface{}, _ string, _ ...interface{}) error {
+		return nil
 	}
+	conn := &Connection{}
 
 	elems := []BatchElem{
 		{Method: "sendTransaction"},
@@ -150,13 +162,16 @@ func TestBatchCallContextRejectsStateChangingMethods(t *testing.T) {
 }
 
 func BenchmarkBatchCallContextVsSerial(b *testing.B) {
-	conn := &Connection{
-		testCallContextHook: func(_ context.Context, result interface{}, _ string, _ ...interface{}) error {
-			time.Sleep(100 * time.Microsecond)
-			*(result.(*int64)) = 1
-			return nil
-		},
+	originExecutor := batchCallExecutor
+	b.Cleanup(func() {
+		batchCallExecutor = originExecutor
+	})
+	batchCallExecutor = func(_ *Connection, _ context.Context, result interface{}, _ string, _ ...interface{}) error {
+		time.Sleep(100 * time.Microsecond)
+		*(result.(*int64)) = 1
+		return nil
 	}
+	conn := &Connection{}
 
 	makeElems := func() []BatchElem {
 		results := make([]int64, 8)
@@ -171,7 +186,7 @@ func BenchmarkBatchCallContextVsSerial(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			elems := makeElems()
 			for j := range elems {
-				if err := conn.CallContext(context.Background(), elems[j].Result, elems[j].Method, elems[j].Args...); err != nil {
+				if err := batchCallExecutor(conn, context.Background(), elems[j].Result, elems[j].Method, elems[j].Args...); err != nil {
 					b.Fatalf("serial call failed: %v", err)
 				}
 			}

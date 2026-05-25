@@ -57,13 +57,12 @@ type Error interface {
 
 // Connection represents a connection to an RPC server.
 type Connection struct {
-	csdk                *csdk.CSDK
-	idCounter           int64
-	blockNumberNotify   func(int64)
-	notifyLock          sync.Mutex
-	closed              bool
-	lock                sync.Mutex
-	testCallContextHook func(ctx context.Context, result interface{}, method string, args ...interface{}) error
+	csdk              *csdk.CSDK
+	idCounter         int64
+	blockNumberNotify func(int64)
+	notifyLock        sync.Mutex
+	closed            bool
+	lock              sync.Mutex
 }
 
 type requestOp struct {
@@ -78,6 +77,10 @@ var nonBatchableRPCMethods = map[string]struct{}{
 	"asyncSendTransaction":   {},
 	"sendTransaction":        {},
 	"SendEncodedTransaction": {},
+}
+
+var batchCallExecutor = func(c *Connection, ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	return c.CallContext(ctx, result, method, args...)
 }
 
 type EventLogRespResult struct {
@@ -377,7 +380,7 @@ func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) er
 		result := elems[i].Result
 		pending++
 		go func(index int, method string, args []interface{}, result interface{}) {
-			err := c.CallContext(ctx, result, method, args...)
+			err := batchCallExecutor(c, ctx, result, method, args...)
 			select {
 			case results <- callResult{index: index, err: err}:
 			case <-ctx.Done():
@@ -421,9 +424,6 @@ func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) er
 // The result must be a pointer so that package json can unmarshal into it. You
 // can also pass nil, in which case the result is ignored.
 func (c *Connection) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
-	if c.testCallContextHook != nil {
-		return c.testCallContextHook(ctx, result, method, args...)
-	}
 	//logrus.Infof("CallContext method:%s\n", method)
 	op := &requestOp{respChanData: &csdk.CallbackChan{Data: nil}}
 
