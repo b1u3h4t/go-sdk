@@ -10,7 +10,7 @@ import (
 
 func TestBatchCallContextSuccess(t *testing.T) {
 	conn := &Connection{
-		callContextHook: func(_ context.Context, result interface{}, method string, _ ...interface{}) error {
+		testCallContextHook: func(_ context.Context, result interface{}, method string, _ ...interface{}) error {
 			switch method {
 			case "getBlockNumber":
 				*(result.(*int64)) = 100
@@ -54,7 +54,7 @@ func TestBatchCallContextSuccess(t *testing.T) {
 func TestBatchCallContextPartialFailureIsolation(t *testing.T) {
 	expectedErr := errors.New("mock failure")
 	conn := &Connection{
-		callContextHook: func(_ context.Context, result interface{}, method string, _ ...interface{}) error {
+		testCallContextHook: func(_ context.Context, result interface{}, method string, _ ...interface{}) error {
 			switch method {
 			case "getBlockNumber":
 				*(result.(*int64)) = 123
@@ -93,7 +93,7 @@ func TestBatchCallContextPartialFailureIsolation(t *testing.T) {
 
 func TestBatchCallContextCancelTimeout(t *testing.T) {
 	conn := &Connection{
-		callContextHook: func(ctx context.Context, result interface{}, method string, _ ...interface{}) error {
+		testCallContextHook: func(ctx context.Context, result interface{}, method string, _ ...interface{}) error {
 			switch method {
 			case "fast":
 				*(result.(*int64)) = 7
@@ -129,7 +129,7 @@ func TestBatchCallContextCancelTimeout(t *testing.T) {
 
 func TestBatchCallContextRejectsStateChangingMethods(t *testing.T) {
 	conn := &Connection{
-		callContextHook: func(_ context.Context, _ interface{}, _ string, _ ...interface{}) error {
+		testCallContextHook: func(_ context.Context, _ interface{}, _ string, _ ...interface{}) error {
 			return nil
 		},
 	}
@@ -151,7 +151,7 @@ func TestBatchCallContextRejectsStateChangingMethods(t *testing.T) {
 
 func BenchmarkBatchCallContextVsSerial(b *testing.B) {
 	conn := &Connection{
-		callContextHook: func(_ context.Context, result interface{}, _ string, _ ...interface{}) error {
+		testCallContextHook: func(_ context.Context, result interface{}, _ string, _ ...interface{}) error {
 			time.Sleep(100 * time.Microsecond)
 			*(result.(*int64)) = 1
 			return nil

@@ -57,13 +57,13 @@ type Error interface {
 
 // Connection represents a connection to an RPC server.
 type Connection struct {
-	csdk              *csdk.CSDK
-	idCounter         int64
-	blockNumberNotify func(int64)
-	notifyLock        sync.Mutex
-	closed            bool
-	lock              sync.Mutex
-	callContextHook   func(ctx context.Context, result interface{}, method string, args ...interface{}) error
+	csdk                *csdk.CSDK
+	idCounter           int64
+	blockNumberNotify   func(int64)
+	notifyLock          sync.Mutex
+	closed              bool
+	lock                sync.Mutex
+	testCallContextHook func(ctx context.Context, result interface{}, method string, args ...interface{}) error
 }
 
 type requestOp struct {
@@ -388,7 +388,6 @@ func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) er
 	for pending > 0 {
 		select {
 		case <-ctx.Done():
-			ctxErr := ctx.Err()
 		drainResults:
 			for {
 				select {
@@ -400,6 +399,7 @@ func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) er
 					break drainResults
 				}
 			}
+			ctxErr := ctx.Err()
 			for i := range elems {
 				if !done[i] {
 					elems[i].Error = ctxErr
@@ -421,8 +421,8 @@ func (c *Connection) BatchCallContext(ctx context.Context, elems []BatchElem) er
 // The result must be a pointer so that package json can unmarshal into it. You
 // can also pass nil, in which case the result is ignored.
 func (c *Connection) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
-	if c.callContextHook != nil {
-		return c.callContextHook(ctx, result, method, args...)
+	if c.testCallContextHook != nil {
+		return c.testCallContextHook(ctx, result, method, args...)
 	}
 	//logrus.Infof("CallContext method:%s\n", method)
 	op := &requestOp{respChanData: &csdk.CallbackChan{Data: nil}}
