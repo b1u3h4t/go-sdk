@@ -476,7 +476,7 @@ func TestAsnycHelloWorldSet(t *testing.T) {
 	var wg sync.WaitGroup
 	count := 50
 	for i := 0; i < count; i++ {
-		tx := types.NewSimpleTx(&address, input, HelloWorldABI, "", "", c.SMCrypto())
+		tx := types.NewSimpleTx(&address, input, HelloWorldABI, types.NewNonceV4(), "", c.SMCrypto())
 		err = c.AsyncSendTransaction(context.Background(), tx, func(receipt *types.Receipt, err error) {
 			wg.Done()
 			if err != nil {
@@ -510,7 +510,7 @@ func TestHelloWorldSet(t *testing.T) {
 	}
 	count := 5
 	for i := 0; i < count; i++ {
-		tx := types.NewSimpleTx(&address, input, HelloWorldABI, "", "", c.SMCrypto())
+		tx := types.NewSimpleTx(&address, input, HelloWorldABI, types.NewNonceV4(), "", c.SMCrypto())
 		receipt, err = c.SendTransaction(context.Background(), tx)
 		if err != nil {
 			t.Fatalf("SendTransaction error: %v", err)
@@ -541,7 +541,7 @@ func TestSetPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parsed.Pack error: %v", err)
 	}
-	txPointer := types.NewSimpleTx(&address, input, HelloWorldABI, "", "", c.SMCrypto())
+	txPointer := types.NewSimpleTx(&address, input, HelloWorldABI, types.NewNonceV4(), "", c.SMCrypto())
 	receipt, err = c.SendTransaction(context.Background(), txPointer)
 	if err != nil {
 		t.Fatalf("SendTransaction error: %v", err)
@@ -558,7 +558,7 @@ func TestSetPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetPrivateKey failed of %v", err)
 	}
-	txPointer = types.NewSimpleTx(&address, input, HelloWorldABI, "", "", c.SMCrypto())
+	txPointer = types.NewSimpleTx(&address, input, HelloWorldABI, types.NewNonceV4(), "", c.SMCrypto())
 	receipt, err = c.SendTransaction(context.Background(), txPointer)
 	if err != nil {
 		t.Fatalf("SendTransaction error: %v", err)
@@ -602,7 +602,7 @@ func BenchmarkHelloWorldSet(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		txPointer := types.NewSimpleTx(&address, input, HelloWorldABI, "", "", c.SMCrypto())
+		txPointer := types.NewSimpleTx(&address, input, HelloWorldABI, types.NewNonceV4(), "", c.SMCrypto())
 		receipt, err = c.SendTransaction(context.Background(), txPointer)
 		if err != nil {
 			b.Fatalf("SendTransaction error: %v", err)
@@ -630,7 +630,7 @@ func BenchmarkAsyncHelloWorldSet(b *testing.B) {
 		if err != nil {
 			b.Fatalf("parsed.Pack error: %v", err)
 		}
-		txPointer := types.NewSimpleTx(&address, input, HelloWorldABI, "", "", c.SMCrypto())
+		txPointer := types.NewSimpleTx(&address, input, HelloWorldABI, types.NewNonceV4(), "", c.SMCrypto())
 		err = c.AsyncSendTransaction(context.Background(), txPointer, func(receipt *types.Receipt, err error) {
 			wg.Done()
 			if err != nil {

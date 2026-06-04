@@ -9,6 +9,7 @@ import (
 	"github.com/FISCO-BCOS/go-sdk/v3/smcrypto/sm3"
 	"github.com/TarsCloud/TarsGo/tars/protocol/codec"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -351,8 +352,20 @@ func NewTransaction(to *common.Address, amount *big.Int, gasLimit int64, gasPric
 	return newTransaction(to, amount, gasLimit, gasPrice, blockLimit, data, nonce, chainId, groupId, extraData, smcrypto)
 }
 
-// NewSimpleTx creates a contract transaction, if nonce is empty string, the nonce will be auto generated
+// NewNonceV4 generates a UUID v4 string for use as transaction nonce.
+func NewNonceV4() string {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate nonce: %v", err))
+	}
+	return id.String()
+}
+
+// NewSimpleTx creates a contract transaction, if nonce is empty string, a UUID v4 nonce will be auto generated
 func NewSimpleTx(to *common.Address, data []byte, abi, nonce, extraData string, smcrypto bool) *Transaction {
+	if nonce == "" {
+		nonce = NewNonceV4()
+	}
 	if len(data) > 0 {
 		data = common.CopyBytes(data)
 	}

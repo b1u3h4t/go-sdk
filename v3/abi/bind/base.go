@@ -232,7 +232,7 @@ func (c *BoundContract) Transfer(opts *TransactOpts) (*types.Transaction, *types
 func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, input []byte, abi string) (*types.Transaction, *types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error
-	tx := types.NewSimpleTx(contract, input, abi, "", "", c.transactor.SMCrypto())
+	tx := types.NewSimpleTx(contract, input, abi, types.NewNonceV4(), "", c.transactor.SMCrypto())
 	if receipt, err = c.transactor.SendTransaction(ensureContext(opts.Context), tx); err != nil {
 		return nil, nil, err
 	}
@@ -240,7 +240,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 }
 
 func (c *BoundContract) asyncTransact(opts *TransactOpts, contract *common.Address, input []byte, abi string, handler func(*types.Receipt, error)) (*types.Transaction, error) {
-	tx := types.NewSimpleTx(contract, input, abi, "", "", c.transactor.SMCrypto())
+	tx := types.NewSimpleTx(contract, input, abi, types.NewNonceV4(), "", c.transactor.SMCrypto())
 	if err := c.transactor.AsyncSendTransaction(ensureContext(opts.Context), tx, handler); err != nil {
 		return nil, err
 	}
