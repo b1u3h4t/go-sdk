@@ -222,11 +222,50 @@ func (c *Client) CallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte
 	return hexBytes, nil
 }
 
+func (c *Client) blockLimitForTransaction() (int64, error) {
+	blockLimit := c.conn.GetCSDK().GetBlockLimit()
+	if blockLimit <= 0 {
+		return 0, fmt.Errorf("invalid block limit: %d", blockLimit)
+	}
+	return int64(blockLimit), nil
+}
+
+// buildSignedEncodedTransaction builds a signed encoded transaction.
+// When nonce is non-empty, uses CreateEncodedTransactionDataV1WithNonce (bcos_sdk_create_transaction_v1_data).
+func (c *Client) buildSignedEncodedTransaction(ctx context.Context, tx *types.Transaction) ([]byte, error) {
+	blockLimit, err := c.blockLimitForTransaction()
+	if err != nil {
+		return nil, fmt.Errorf("get block limit: %w", err)
+	}
+	nonce := strings.TrimSpace(tx.Nonce())
+	var txData, txHash []byte
+	if nonce != "" {
+		txData, txHash, err = c.CreateEncodedTransactionDataV1WithNonce(ctx, tx.To(), tx.Input(), blockLimit, tx.ABI(), nonce, "", "")
+	} else {
+		txData, txHash, err = c.CreateEncodedTransactionDataV1(tx.To(), tx.Input(), blockLimit, tx.ABI())
+	}
+	if err != nil {
+		return nil, err
+	}
+	sig, err := c.CreateEncodedSignature(txHash)
+	if err != nil {
+		return nil, err
+	}
+	return c.CreateEncodedTransaction(txData, txHash, sig, 0, tx.ExtraData)
+}
+
 // SendTransaction injects a signed transaction into the pending pool for execution.
 //
 // If the transaction was a contract creation use the TransactionReceipt method to get the
 // contract address after the transaction has been mined.
 func (c *Client) SendTransaction(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
+	if strings.TrimSpace(tx.Nonce()) != "" {
+		encoded, err := c.buildSignedEncodedTransaction(ctx, tx)
+		if err != nil {
+			return nil, err
+		}
+		return c.SendEncodedTransaction(ctx, encoded, false)
+	}
 	var err error
 	var anonymityReceipt = &struct {
 		types.Receipt
@@ -249,6 +288,13 @@ func (c *Client) SendTransaction(ctx context.Context, tx *types.Transaction) (*t
 
 // AsyncSendTransaction send transaction async
 func (c *Client) AsyncSendTransaction(ctx context.Context, tx *types.Transaction, handler func(*types.Receipt, error)) error {
+	if strings.TrimSpace(tx.Nonce()) != "" {
+		encoded, err := c.buildSignedEncodedTransaction(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return c.AsyncSendEncodedTransaction(ctx, encoded, false, handler)
+	}
 	var err error
 	var anonymityReceipt = &struct {
 		types.Receipt
