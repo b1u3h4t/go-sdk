@@ -52,6 +52,9 @@ type TransactOpts struct {
 	GasPrice *big.Int        // Gas price to use for the transaction execution (nil = gas price oracle)
 	GasLimit *big.Int        // Gas limit to set for the transaction execution (0 = estimate)
 	Context  context.Context // Network context to support cancellation and timeouts (nil = no timeout)
+
+	// BeforeSendTxHash is invoked after the tx hash is computed and before broadcast.
+	BeforeSendTxHash func(hash common.Hash)
 }
 
 // FilterOpts is the collection of options to fine tune filtering for events
@@ -233,7 +236,11 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	var receipt *types.Receipt
 	var err error
 	tx := types.NewSimpleTx(contract, input, abi, types.NewNonceV4(), "", c.transactor.SMCrypto())
-	if receipt, err = c.transactor.SendTransaction(ensureContext(opts.Context), tx); err != nil {
+	ctx := ensureContext(opts.Context)
+	if opts.BeforeSendTxHash != nil {
+		ctx = types.ContextWithBeforeSendTxHash(ctx, opts.BeforeSendTxHash)
+	}
+	if receipt, err = c.transactor.SendTransaction(ctx, tx); err != nil {
 		return nil, nil, err
 	}
 	return tx, receipt, nil
@@ -241,7 +248,11 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 
 func (c *BoundContract) asyncTransact(opts *TransactOpts, contract *common.Address, input []byte, abi string, handler func(*types.Receipt, error)) (*types.Transaction, error) {
 	tx := types.NewSimpleTx(contract, input, abi, types.NewNonceV4(), "", c.transactor.SMCrypto())
-	if err := c.transactor.AsyncSendTransaction(ensureContext(opts.Context), tx, handler); err != nil {
+	ctx := ensureContext(opts.Context)
+	if opts.BeforeSendTxHash != nil {
+		ctx = types.ContextWithBeforeSendTxHash(ctx, opts.BeforeSendTxHash)
+	}
+	if err := c.transactor.AsyncSendTransaction(ctx, tx, handler); err != nil {
 		return nil, err
 	}
 	return tx, nil
