@@ -274,7 +274,6 @@ func (c *Client) SendTransaction(ctx context.Context, tx *types.Transaction) (*t
 			return nil, err
 		}
 		c.setPendingHashFromEncoded(tx, encoded)
-		c.setPendingHashFromEncoded(tx, encoded)
 		if fn := types.BeforeSendTxHashFromContext(ctx); fn != nil {
 			fn(tx.Hash())
 		}
@@ -307,7 +306,6 @@ func (c *Client) AsyncSendTransaction(ctx context.Context, tx *types.Transaction
 		if err != nil {
 			return err
 		}
-		c.setPendingHashFromEncoded(tx, encoded)
 		c.setPendingHashFromEncoded(tx, encoded)
 		if fn := types.BeforeSendTxHashFromContext(ctx); fn != nil {
 			fn(tx.Hash())
