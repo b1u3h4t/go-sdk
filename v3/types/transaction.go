@@ -433,12 +433,34 @@ func (tx *Transaction) To() *common.Address {
 	return &to
 }
 
+// SetPendingHash records the on-chain transaction hash computed before broadcast.
+// Subsequent Hash() calls return this value instead of recomputing from incomplete TransactionData.
+func (tx *Transaction) SetPendingHash(h common.Hash) {
+	if tx == nil {
+		return
+	}
+	c := h
+	tx.DataHash = &c
+}
+
+// HashFromEncoded returns the on-chain transaction hash of a signed encoded transaction.
+func HashFromEncoded(encoded []byte, smCrypto bool) (common.Hash, error) {
+	if len(encoded) == 0 {
+		return common.Hash{}, errors.New("encoded transaction is empty")
+	}
+	tx := &Transaction{SMCrypto: smCrypto}
+	if err := tx.ReadFrom(codec.NewReader(encoded)); err != nil {
+		return common.Hash{}, fmt.Errorf("decode encoded transaction: %w", err)
+	}
+	return tx.Hash(), nil
+}
+
 // Hash hashes the RLP encoding of tx.
 // It uniquely identifies the transaction.
 func (tx *Transaction) Hash() common.Hash {
-	// if hash := tx.DataHash; hash != nil {
-	// 	return *hash
-	// }
+	if hash := tx.DataHash; hash != nil {
+		return *hash
+	}
 	var v common.Hash
 	if tx.SMCrypto {
 		v = tx.sm3Hash()
@@ -446,7 +468,7 @@ func (tx *Transaction) Hash() common.Hash {
 		v = tx.keccak256Hash()
 	}
 	tx.DataHash = &v
-	return *tx.DataHash
+	return v
 }
 
 // SM3HashNonSig hashes the RLP encoding of tx use sm3.

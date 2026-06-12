@@ -236,7 +236,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	if receipt, err = c.transactor.SendTransaction(ensureContext(opts.Context), tx); err != nil {
 		return nil, nil, err
 	}
-	return nil, receipt, nil
+	return tx, receipt, nil
 }
 
 func (c *BoundContract) asyncTransact(opts *TransactOpts, contract *common.Address, input []byte, abi string, handler func(*types.Receipt, error)) (*types.Transaction, error) {
@@ -244,7 +244,7 @@ func (c *BoundContract) asyncTransact(opts *TransactOpts, contract *common.Addre
 	if err := c.transactor.AsyncSendTransaction(ensureContext(opts.Context), tx, handler); err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return tx, nil
 }
 
 // WatchLogs filters subscribes to contract logs for future blocks, returning a

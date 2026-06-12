@@ -258,12 +258,22 @@ func (c *Client) buildSignedEncodedTransaction(ctx context.Context, tx *types.Tr
 //
 // If the transaction was a contract creation use the TransactionReceipt method to get the
 // contract address after the transaction has been mined.
+func (c *Client) setPendingHashFromEncoded(tx *types.Transaction, encoded []byte) {
+	if tx == nil || len(encoded) == 0 {
+		return
+	}
+	if chainHash, err := types.HashFromEncoded(encoded, tx.SMCrypto); err == nil {
+		tx.SetPendingHash(chainHash)
+	}
+}
+
 func (c *Client) SendTransaction(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
 	if strings.TrimSpace(tx.Nonce()) != "" {
 		encoded, err := c.buildSignedEncodedTransaction(ctx, tx)
 		if err != nil {
 			return nil, err
 		}
+		c.setPendingHashFromEncoded(tx, encoded)
 		return c.SendEncodedTransaction(ctx, encoded, false)
 	}
 	var err error
@@ -293,6 +303,7 @@ func (c *Client) AsyncSendTransaction(ctx context.Context, tx *types.Transaction
 		if err != nil {
 			return err
 		}
+		c.setPendingHashFromEncoded(tx, encoded)
 		return c.AsyncSendEncodedTransaction(ctx, encoded, false, handler)
 	}
 	var err error

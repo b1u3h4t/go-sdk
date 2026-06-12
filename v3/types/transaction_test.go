@@ -93,3 +93,27 @@ func TestUnmarshalTransactionDataDeploy(t *testing.T) {
 	checkTransaction(DEPLOY_HELLOWORLD_TX_DATA_GM, DEPLOY_HELLOWORLD_TX_GM, true, t)
 	checkTransaction(HELLOWORLD_SET_TX_DATA_GM, HELLOWORLD_SET_TX_GM, true, t)
 }
+
+func TestSetPendingHash(t *testing.T) {
+	tx := NewSimpleTx(nil, []byte{0x01}, "", NewNonceV4(), "", true)
+	want := common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+	tx.SetPendingHash(want)
+	if got := tx.Hash(); got != want {
+		t.Fatalf("Hash() = %s, want %s", got.Hex(), want.Hex())
+	}
+}
+
+func TestHashFromEncoded(t *testing.T) {
+	encoded := common.FromHex(HELLOWORLD_SET_TX_GM)
+	got, err := HashFromEncoded(encoded, true)
+	if err != nil {
+		t.Fatalf("HashFromEncoded error: %v", err)
+	}
+	tx := &Transaction{SMCrypto: true}
+	if err := tx.ReadFrom(codec.NewReader(encoded)); err != nil {
+		t.Fatalf("ReadFrom error: %v", err)
+	}
+	if got != tx.Hash() {
+		t.Fatalf("HashFromEncoded = %s, decoded Hash = %s", got.Hex(), tx.Hash().Hex())
+	}
+}
