@@ -230,28 +230,17 @@ func (c *Client) blockLimitForTransaction() (int64, error) {
 	return int64(blockLimit), nil
 }
 
-// buildSignedEncodedTransaction builds a signed encoded transaction.
-// When nonce is non-empty, uses CreateEncodedTransactionDataV1WithNonce (bcos_sdk_create_transaction_v1_data).
+// buildSignedEncodedTransaction builds a signed encoded transaction via one-shot full_fields C API.
 func (c *Client) buildSignedEncodedTransaction(ctx context.Context, tx *types.Transaction) ([]byte, error) {
-	blockLimit, err := c.blockLimitForTransaction()
-	if err != nil {
-		return nil, fmt.Errorf("get block limit: %w", err)
+	opts := &SignEncodedOpts{
+		Nonce:     strings.TrimSpace(tx.Nonce()),
+		ExtraData: tx.ExtraData,
 	}
-	nonce := strings.TrimSpace(tx.Nonce())
-	var txData, txHash []byte
-	if nonce != "" {
-		txData, txHash, err = c.CreateEncodedTransactionDataV1WithNonce(ctx, tx.To(), tx.Input(), blockLimit, tx.ABI(), nonce, "", "")
-	} else {
-		txData, txHash, err = c.CreateEncodedTransactionDataV1(tx.To(), tx.Input(), blockLimit, tx.ABI())
-	}
+	signed, err := c.SignEncodedTransactionWithFullFields(ctx, tx.To(), tx.Input(), tx.ABI(), opts)
 	if err != nil {
 		return nil, err
 	}
-	sig, err := c.CreateEncodedSignature(txHash)
-	if err != nil {
-		return nil, err
-	}
-	return c.CreateEncodedTransaction(txData, txHash, sig, 0, tx.ExtraData)
+	return signed.Encoded, nil
 }
 
 // SendTransaction injects a signed transaction into the pending pool for execution.
