@@ -19,6 +19,8 @@ type SignEncodedOpts struct {
 	PrivateKey []byte
 	// Attribute is the transaction attribute flag (usually 0).
 	Attribute int32
+	// BlockLimit when > 0 overrides RPC block limit (e.g. blockNum+500 from caller cache).
+	BlockLimit int64
 }
 
 // SignedEncodedTx holds the chain tx hash and signed encoded bytes for SendEncodedTransaction.
@@ -40,7 +42,7 @@ func (c *Client) SignEncodedTransactionWithFullFields(
 	if c == nil {
 		return nil, fmt.Errorf("client is nil")
 	}
-	blockLimit, err := c.blockLimitForTransaction()
+	blockLimit, err := c.resolveBlockLimit(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("get block limit: %w", err)
 	}
@@ -76,4 +78,21 @@ func (c *Client) SignEncodedTransactionWithFullFields(
 		TxHash:  pair.TxHash,
 		Encoded: pair.SignedTx,
 	}, nil
+}
+
+func (c *Client) resolveBlockLimit(ctx context.Context, opts *SignEncodedOpts) (int64, error) {
+	if opts != nil && opts.BlockLimit > 0 {
+		return opts.BlockLimit, nil
+	}
+	if bl, err := c.blockLimitForTransaction(); err == nil && bl > 0 {
+		return bl, nil
+	}
+	bn, err := c.GetBlockNumber(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if bn < 0 {
+		return 0, fmt.Errorf("invalid block number: %d", bn)
+	}
+	return bn + 500, nil
 }
