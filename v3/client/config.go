@@ -17,6 +17,12 @@ type Config struct {
 	Host            string
 	Port            int
 	DisableSsl      bool
+	// ConfigFile, when set, takes precedence over Peers/Host/Port (bcos-c-sdk INI format).
+	ConfigFile string
+	// Peers lists RPC endpoints for multi-peer failover. When empty, Host/Port is used (single peer).
+	Peers []Endpoint
+	// SdkCommon optionally overrides INI [common] for programmatic multi-peer connections.
+	SdkCommon SdkCommonConfig
 	// TLSCaContext   []byte
 	// TLSKeyContext  []byte
 	// TLSCertContext []byte

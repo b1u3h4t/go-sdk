@@ -159,34 +159,83 @@ func NewConnectionByFile(configFile, groupID string, privateKey []byte) (*Connec
 }
 
 func NewConnection(config *Config) (*Connection, error) {
-	path, _ := os.Getwd()
-	if !config.DisableSsl {
-		if _, err := os.Stat(config.TLSCaFile); os.IsNotExist(err) {
-			return nil, fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSCaFile, path)
-		} else if _, err := os.Stat(config.TLSKeyFile); os.IsNotExist(err) {
-			return nil, fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSKeyFile, path)
-		} else if _, err := os.Stat(config.TLSCertFile); os.IsNotExist(err) {
-			return nil, fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSCertFile, path)
-		}
-		if config.IsSMCrypto {
-			if _, err := os.Stat(config.TLSSmEnKeyFile); os.IsNotExist(err) {
-				return nil, fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSSmEnKeyFile, path)
-			} else if _, err := os.Stat(config.TLSSmEnCertFile); os.IsNotExist(err) {
-				return nil, fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSSmEnCertFile, path)
-			}
-		}
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
 	}
-	sdk, err := csdk.NewSDK(config.GroupID, config.Host, config.Port, config.IsSMCrypto, config.PrivateKey, config.DisableSsl, config.TLSCaFile, config.TLSKeyFile, config.TLSCertFile, config.TLSSmEnKeyFile, config.TLSSmEnCertFile)
+	if len(config.PrivateKey) == 0 {
+		return nil, fmt.Errorf("private key is empty")
+	}
+
+	if config.ConfigFile != "" {
+		return NewConnectionByFile(config.ConfigFile, config.GroupID, config.PrivateKey)
+	}
+
+	if err := validateTLSFiles(config); err != nil {
+		return nil, err
+	}
+
+	var (
+		sdk *csdk.CSDK
+		err error
+	)
+	if len(config.Peers) > 0 {
+		sdk, err = csdk.NewSDKWithPeers(
+			config.GroupID,
+			toCSDKEndpoints(config.Peers),
+			config.IsSMCrypto,
+			config.PrivateKey,
+			config.DisableSsl,
+			config.TLSCaFile,
+			config.TLSKeyFile,
+			config.TLSCertFile,
+			config.TLSSmEnKeyFile,
+			config.TLSSmEnCertFile,
+			config.csdkOptions(),
+		)
+	} else {
+		sdk, err = csdk.NewSDK(
+			config.GroupID,
+			config.Host,
+			config.Port,
+			config.IsSMCrypto,
+			config.PrivateKey,
+			config.DisableSsl,
+			config.TLSCaFile,
+			config.TLSKeyFile,
+			config.TLSCertFile,
+			config.TLSSmEnKeyFile,
+			config.TLSSmEnCertFile,
+		)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("new csdk failed: %v", err)
 	}
-	if err != nil {
-		return nil, err
+	return &Connection{csdk: sdk}, nil
+}
+
+func validateTLSFiles(config *Config) error {
+	path, _ := os.Getwd()
+	if config.DisableSsl {
+		return nil
 	}
-	c := &Connection{
-		csdk: sdk,
+	if _, err := os.Stat(config.TLSCaFile); os.IsNotExist(err) {
+		return fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSCaFile, path)
 	}
-	return c, nil
+	if _, err := os.Stat(config.TLSKeyFile); os.IsNotExist(err) {
+		return fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSKeyFile, path)
+	}
+	if _, err := os.Stat(config.TLSCertFile); os.IsNotExist(err) {
+		return fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSCertFile, path)
+	}
+	if config.IsSMCrypto {
+		if _, err := os.Stat(config.TLSSmEnKeyFile); os.IsNotExist(err) {
+			return fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSSmEnKeyFile, path)
+		}
+		if _, err := os.Stat(config.TLSSmEnCertFile); os.IsNotExist(err) {
+			return fmt.Errorf("the file %s does not exist, current working directory is %s", config.TLSSmEnCertFile, path)
+		}
+	}
+	return nil
 }
 func (c *Connection) GetCSDK() *csdk.CSDK {
 	return c.csdk

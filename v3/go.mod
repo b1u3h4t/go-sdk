@@ -2,10 +2,10 @@ module github.com/FISCO-BCOS/go-sdk/v3
 
 go 1.21.5
 
-replace github.com/FISCO-BCOS/bcos-c-sdk => github.com/b1u3h4t/bcos-c-sdk v0.0.0-20260626075714-dffc547c9d99
+replace github.com/FISCO-BCOS/bcos-c-sdk => github.com/b1u3h4t/bcos-c-sdk v0.0.0-20260707025131-6227bbe84445
 
 require (
-	github.com/FISCO-BCOS/bcos-c-sdk v0.0.0-20260626075714-dffc547c9d99
+	github.com/FISCO-BCOS/bcos-c-sdk v0.0.0-20260707025131-6227bbe84445
 	github.com/FISCO-BCOS/crypto v0.0.0-20200202032121-bd8ab0b5d4f1
 	github.com/TarsCloud/TarsGo v1.4.5
 	github.com/deckarep/golang-set/v2 v2.6.0
