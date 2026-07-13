@@ -230,6 +230,28 @@ func (c *Client) blockLimitForTransaction() (int64, error) {
 	return int64(blockLimit), nil
 }
 
+// BlockLimit returns blockLimit (blockNumber+500) from C SDK push-maintained cache (getBlockLimit).
+// Falls back to GetBlockNumber RPC + 500 when the cache is cold.
+func (c *Client) BlockLimit(ctx context.Context) (int64, error) {
+	if c == nil {
+		return 0, fmt.Errorf("client is nil")
+	}
+	if bl, err := c.blockLimitForTransaction(); err == nil && bl > 0 {
+		return bl, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	bn, err := c.GetBlockNumber(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if bn < 0 {
+		return 0, fmt.Errorf("invalid block number: %d", bn)
+	}
+	return bn + 500, nil
+}
+
 // buildSignedEncodedTransaction builds a signed encoded transaction via one-shot full_fields C API.
 func (c *Client) buildSignedEncodedTransaction(ctx context.Context, tx *types.Transaction) ([]byte, error) {
 	opts := &SignEncodedOpts{
