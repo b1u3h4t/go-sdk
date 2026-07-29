@@ -2,7 +2,7 @@ module github.com/FISCO-BCOS/go-sdk/v3
 
 go 1.21.5
 
-replace github.com/FISCO-BCOS/bcos-c-sdk => github.com/b1u3h4t/bcos-c-sdk v0.0.0-20260707025131-6227bbe84445
+replace github.com/FISCO-BCOS/bcos-c-sdk => github.com/b1u3h4t/bcos-c-sdk v0.0.0-20260729090030-84f3d14ef541
 
 require (
 	github.com/FISCO-BCOS/bcos-c-sdk v0.0.0-20260707025131-6227bbe84445
