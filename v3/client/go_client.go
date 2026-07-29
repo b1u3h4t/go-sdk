@@ -253,42 +253,38 @@ func (c *Client) BlockLimit(ctx context.Context) (int64, error) {
 }
 
 // buildSignedEncodedTransaction builds a signed encoded transaction via one-shot full_fields C API.
-func (c *Client) buildSignedEncodedTransaction(ctx context.Context, tx *types.Transaction) ([]byte, error) {
+// TxHash comes from the C SDK (same value HashFromEncoded would recompute from encoded bytes).
+func (c *Client) buildSignedEncodedTransaction(ctx context.Context, tx *types.Transaction) (*SignedEncodedTx, error) {
 	opts := &SignEncodedOpts{
 		Nonce:     strings.TrimSpace(tx.Nonce()),
 		ExtraData: tx.ExtraData,
 	}
-	signed, err := c.SignEncodedTransactionWithFullFields(ctx, tx.To(), tx.Input(), tx.ABI(), opts)
-	if err != nil {
-		return nil, err
+	return c.SignEncodedTransactionWithFullFields(ctx, tx.To(), tx.Input(), tx.ABI(), opts)
+}
+
+// setPendingHashFromSignedTx records the chain tx hash returned by C SDK signing.
+func (c *Client) setPendingHashFromSignedTx(tx *types.Transaction, signed *SignedEncodedTx) {
+	if tx == nil || signed == nil || strings.TrimSpace(signed.TxHash) == "" {
+		return
 	}
-	return signed.Encoded, nil
+	tx.SetPendingHash(common.HexToHash(signed.TxHash))
 }
 
 // SendTransaction injects a signed transaction into the pending pool for execution.
 //
 // If the transaction was a contract creation use the TransactionReceipt method to get the
 // contract address after the transaction has been mined.
-func (c *Client) setPendingHashFromEncoded(tx *types.Transaction, encoded []byte) {
-	if tx == nil || len(encoded) == 0 {
-		return
-	}
-	if chainHash, err := types.HashFromEncoded(encoded, tx.SMCrypto); err == nil {
-		tx.SetPendingHash(chainHash)
-	}
-}
-
 func (c *Client) SendTransaction(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
 	if strings.TrimSpace(tx.Nonce()) != "" {
-		encoded, err := c.buildSignedEncodedTransaction(ctx, tx)
+		signed, err := c.buildSignedEncodedTransaction(ctx, tx)
 		if err != nil {
 			return nil, err
 		}
-		c.setPendingHashFromEncoded(tx, encoded)
+		c.setPendingHashFromSignedTx(tx, signed)
 		if fn := types.BeforeSendTxHashFromContext(ctx); fn != nil {
 			fn(tx.Hash())
 		}
-		return c.SendEncodedTransaction(ctx, encoded, false)
+		return c.SendEncodedTransaction(ctx, signed.Encoded, false)
 	}
 	var err error
 	var anonymityReceipt = &struct {
@@ -313,15 +309,15 @@ func (c *Client) SendTransaction(ctx context.Context, tx *types.Transaction) (*t
 // AsyncSendTransaction send transaction async
 func (c *Client) AsyncSendTransaction(ctx context.Context, tx *types.Transaction, handler func(*types.Receipt, error)) error {
 	if strings.TrimSpace(tx.Nonce()) != "" {
-		encoded, err := c.buildSignedEncodedTransaction(ctx, tx)
+		signed, err := c.buildSignedEncodedTransaction(ctx, tx)
 		if err != nil {
 			return err
 		}
-		c.setPendingHashFromEncoded(tx, encoded)
+		c.setPendingHashFromSignedTx(tx, signed)
 		if fn := types.BeforeSendTxHashFromContext(ctx); fn != nil {
 			fn(tx.Hash())
 		}
-		return c.AsyncSendEncodedTransaction(ctx, encoded, false, handler)
+		return c.AsyncSendEncodedTransaction(ctx, signed.Encoded, false, handler)
 	}
 	var err error
 	var anonymityReceipt = &struct {
